@@ -366,7 +366,8 @@ public class Cluster {
         final Long timeStamp = new Date().getTime();
         Long timeSpan = 0L;
         if (ENV != null && ENV.equals("prod")) {
-            timeSpan = 2592000L * 1000;
+            // timeSpan = 2592000L * 1000;
+            timeSpan = 1000L * 60 * 60 * 24 * 15;
         } else {
             timeSpan = 48L * 60 * 60 * 1000;
         }
@@ -480,6 +481,7 @@ public class Cluster {
 
                     obj.put("categoryIds", categoryIds);
                     obj.put("newsType", newsType);
+                    obj.put("tags", tags);
                     //category = (JSONArray) JSON.parseArray(categoryIds.toString());
                 } catch (Exception e) {
                 }
@@ -491,11 +493,11 @@ public class Cluster {
         JavaPairRDD<Object, Tuple2<JSONArray, BSONObject>> tagOfDocsLastQuar = docsOfLastQuar.mapValues(extractTags);
         final Map<Object, Tuple2<JSONArray, BSONObject>> tagMapLastHour = tagOfDocsLastHour.collectAsMap();
 
-        PairFlatMapFunction<Tuple2<Object, Tuple2<JSONArray, BSONObject>>, Double, Tuple2<Tuple2<Object, Object>, BSONObject>> map =
-                new PairFlatMapFunction<Tuple2<Object, Tuple2<JSONArray, BSONObject>>, Double, Tuple2<Tuple2<Object, Object>, BSONObject>>() {
-                    public Iterable<Tuple2<Double, Tuple2<Tuple2<Object, Object>, BSONObject>>> call(Tuple2<Object, Tuple2<JSONArray, BSONObject>> pair) {
-                        List<Tuple2<Double, Tuple2<Tuple2<Object, Object>, BSONObject>>> result = new ArrayList<Tuple2<Double, Tuple2<Tuple2<Object, Object>, BSONObject>>>();
-                        BSONObject categoryIds = (BSONObject) pair._2._2;
+        PairFlatMapFunction<Tuple2<Object, Tuple2<JSONArray, BSONObject>>, Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> map =
+                new PairFlatMapFunction<Tuple2<Object, Tuple2<JSONArray, BSONObject>>, Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>() {
+                    public Iterable<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>> call(Tuple2<Object, Tuple2<JSONArray, BSONObject>> pair) {
+                        List<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>> result = new ArrayList<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>>();
+                        BSONObject categoryIds_2 = (BSONObject) pair._2._2;
 
                         for (Map.Entry<Object, Tuple2<JSONArray, BSONObject>> tag : tagMapLastHour.entrySet()) {
                             Double score = 0.0;
@@ -503,6 +505,7 @@ public class Cluster {
                             Object obj1 = tag.getKey();
                             Object obj2 = pair._1;
                             Tuple2<Object, Object> item = new Tuple2<Object, Object>(obj1, obj2);
+                            BSONObject categoryIds_1 = tag.getValue()._2;
 
                             Set<String> strings = new HashSet<String>();
                             System.out.println(pair._2._1);
@@ -529,8 +532,8 @@ public class Cluster {
                             }
                             score = 100.0 * commonTag / strings.size();
                             System.out.println("score is: " + score);
-                            if (score > 10E-6 && score < 100.0) {
-                                Tuple2<Tuple2<Object, Object>, BSONObject> itemWithCategoryIds = new Tuple2<Tuple2<Object, Object>, BSONObject>(item, categoryIds);
+                            if (score > 10E-6 /*&& score < 100.0*/) {
+                                Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>> itemWithCategoryIds = new Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>(item, new Tuple2<BSONObject, BSONObject>(categoryIds_1, categoryIds_2));
                                 result.add(new Tuple2(score, itemWithCategoryIds));
                             }
                         }
@@ -538,37 +541,46 @@ public class Cluster {
                         return result;
                     }
                 };
-        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, BSONObject>> result = tagOfDocsLastQuar.flatMapToPair(map);
+        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result = tagOfDocsLastQuar.flatMapToPair(map);
 
-        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, BSONObject>> result2 = result.sortByKey(false);
+        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result2 = result.sortByKey(false);
         System.out.println("result2.count is: " + result2.count());
         System.out.println("result2 is: ");
         //result2.saveAsTextFile("/directory/result0311_1");
 
         Map<String, Integer> newsCount = new HashMap<String, Integer>();
-        List<Tuple2<Double, Tuple2<Tuple2<Object, Object>, BSONObject>>> out = result2.collect();
+        Map<String, List<RelatedNews>> newsRelated = new HashMap<String, List<RelatedNews>>();
+        Map<String, List<JSONArray>> tagsRelated = new HashMap<String, List<JSONArray>>();
+        List<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>> out = result2.collect();
         final QueuedProducer queuedProducer = new QueuedProducer(Queue_IPAddress1 + ":9092," + Queue_IPAddress2 + ":9092," + Queue_IPAddress3 + ":9092");
-        for (Tuple2<Double, Tuple2<Tuple2<Object, Object>, BSONObject>> entry : out) {
+        for (Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> entry : out) {
             String categoryIds = null;
             if (entry._2._2 != null) {
-                if (entry._2._2.get("categoryIds") != null) {
-                    categoryIds =entry._2._2.get("categoryIds").toString();
+                if (entry._2._2._2.get("categoryIds") != null) {
+                    categoryIds = entry._2._2._2.get("categoryIds").toString();
                 }
             }
             System.out.println(entry._1 + " " + entry._2._1.toString() + " " + categoryIds);
 
+            String index1 = entry._2._1._1.toString();
+            String index2 = entry._2._1._2.toString();
+
+            if (index1.equals(index2)) {
+                continue;
+            }
+
+            if (index1.startsWith("SP-") || index2.startsWith("SP-")) {
+                continue;
+            }
+
             String newsToUpdate = null;
             if (entry._1 > 75.0) {
-                String index1 = entry._2._1._1.toString();
-                String index2 = entry._2._1._2.toString();
                 int contentLength1 = 0;
                 int contentLength2 = 0;
 
-                if (index1.equals(index2)) {
-                    continue;
-                }
+                Long timestamp = System.currentTimeMillis();
+                long NEWS_DURATION = 7 * 24 * 60 * 60 * 1000L;
 
-                /*
                 FindIterable iterable = newsContent.find(new Document("_id", index1));
                 MongoCursor cursor = iterable.iterator();
                 while (cursor.hasNext()) {
@@ -576,6 +588,7 @@ public class Cluster {
                     String content = (String) document.get("content");
                     contentLength1 = content.length();
                 }
+                cursor.close();
 
                 iterable = newsContent.find(new Document("_id", index2));
                 cursor = iterable.iterator();
@@ -584,7 +597,6 @@ public class Cluster {
                     String content = (String) document.get("content");
                     contentLength2 = content.length();
                 }
-
                 cursor.close();
 
                 if (contentLength1 < contentLength2) {
@@ -592,18 +604,73 @@ public class Cluster {
                 } else {
                     newsToUpdate = entry._2._1._2.toString();
                 }
-                */
+
+                newsContent.updateOne(new Document("_id", newsToUpdate),
+                        new Document("$set", new Document("pubtime", timestamp - NEWS_DURATION)),
+                        new UpdateOptions().upsert(true));
             }
 
             if (entry._1 > 60.0 || entry._1 < 2.90) {
                 continue;
             }
 
+            if (entry._2._2 != null) {
+                if (entry._2._2._2.get("categoryIds") != null) {
+                    boolean shouldContinue = false;
+
+                    categoryIds = entry._2._2._2.get("categoryIds").toString();
+                    if (categoryIds != null) {
+                        JSONArray categoryIdsArr = (JSONArray) JSON.parse(categoryIds);
+                        if (categoryIdsArr != null) {
+                            for (int m = 0; m < categoryIdsArr.size(); m++) {
+                                Integer categoryId = (Integer) categoryIdsArr.get(m);
+                                if (categoryId == 36 || categoryId == 38 || categoryId == 78) {
+                                    shouldContinue = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (shouldContinue) {
+                        continue;
+                    }
+                }
+            }
+
+            if (entry._2._2 != null) {
+                if (entry._2._2._1.get("categoryIds") != null) {
+                    boolean shouldContinue = false;
+
+                    categoryIds = entry._2._2._1.get("categoryIds").toString();
+                    if (categoryIds != null) {
+                        JSONArray categoryIdsArr = (JSONArray) JSON.parse(categoryIds);
+                        if (categoryIdsArr != null) {
+                            for (int m = 0; m < categoryIdsArr.size(); m++) {
+                                Integer categoryId = (Integer) categoryIdsArr.get(m);
+                                if (categoryId == 36 || categoryId == 38 || categoryId == 78) {
+                                    shouldContinue = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (shouldContinue) {
+                        continue;
+                    }
+                }
+            }
+
             newsToUpdate = entry._2._1._1.toString();
             String relatedNews = entry._2._1._2.toString();
-            BSONObject category = (BSONObject) entry._2._2.get("categoryIds");
-            String newsType = (String) entry._2._2.get("newsType");
+            BSONObject category = (BSONObject) entry._2._2._2.get("categoryIds");
+            String newsType = (String) entry._2._2._2.get("newsType");
             Integer count = newsCount.get(newsToUpdate);
+            String tags = (String) entry._2._2._2.get("tags");
+            JSONArray tagsArray = null;
+            if (tags != null) {
+                tagsArray = (JSONArray)JSON.parse(tags);
+            }
+
             if (count == null) {
                 newsCount.put(newsToUpdate, 1);
                 Document doc = new Document("newsId", relatedNews);
@@ -615,6 +682,31 @@ public class Cluster {
                         new Document("$push", new Document("relatedNews", doc)),
                         new UpdateOptions().upsert(true));
 
+                List<RelatedNews> newsList = new ArrayList<RelatedNews>();
+                RelatedNews relatedNewsObj = new RelatedNews();
+                relatedNewsObj.setNewsId(relatedNews);
+                relatedNewsObj.setNewsType(MessageType.getByName(newsType));
+                relatedNewsObj.setScore(entry._1);
+                if (category != null) {
+                    System.out.println("category is: " + category.toString());
+                    JSONArray categoryIdsArr = (JSONArray) JSON.parse(category.toString());
+                    if (categoryIdsArr != null) {
+                        List<Integer> ids = new ArrayList<Integer>();
+                        for (int m = 0; m < categoryIdsArr.size(); m++) {
+                            ids.add((Integer)categoryIdsArr.get(m));
+                        }
+                        relatedNewsObj.setCategoryIds(ids);
+                    }
+                }
+                newsList.add(relatedNewsObj);
+                System.out.println(relatedNewsObj.toString());
+                newsRelated.put(newsToUpdate, newsList);
+
+                List<JSONArray> tagsList = new ArrayList<JSONArray>();
+                tagsList.add(tagsArray);
+                tagsRelated.put(newsToUpdate, tagsList);
+
+                /*
                 FindIterable iterable = newsContent.find(new Document("_id", newsToUpdate));
                 MongoCursor cursor = iterable.iterator();
                 while (cursor.hasNext()) {
@@ -654,9 +746,59 @@ public class Cluster {
                     queuedProducer.sendMessage("topic_news_related", msg);
                 }
                 cursor.close();
+                */
 
             } else if (count < 10) {
                 newsCount.put(newsToUpdate, count + 1);
+
+                List<JSONArray> tagsList = tagsRelated.get(newsToUpdate);
+
+                boolean shouldSkip = false;
+
+                try {
+                    for (JSONArray array : tagsList) {
+                        Set<String> strings = new HashSet<String>();
+                        Double commonTag = 0.0;
+
+                        for (int i = 0; i < array.size(); i++) {
+                            JSONObject tagObj = (JSONObject) array.get(i);
+                            for (Map.Entry<String, Object> tagEntry : tagObj.entrySet()) {
+                                String tagString = (String) tagEntry.getKey();
+                                strings.add(tagString);
+                            }
+                        }
+
+                        for (int i = 0; i < tagsArray.size(); i++) {
+                            JSONObject tagObj = (JSONObject) tagsArray.get(i);
+                            for (Map.Entry<String, Object> tagEntry : tagObj.entrySet()) {
+                                String tagString = (String) tagEntry.getKey();
+                                if (strings.contains(tagString)) {
+                                    commonTag += 1.0;
+                                } else {
+                                    strings.add(tagString);
+                                }
+                            }
+                        }
+                        Double score = 100.0 * commonTag / strings.size();
+                        System.out.println("inter-news score is: " + score);
+                        if (score > 75.0) {
+                            System.out.println("inter-news score > 75.0");
+                            System.out.println("newsToUpdate is: " + newsToUpdate);
+                            System.out.println("related news is: " + relatedNews);
+
+                            shouldSkip = true;
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+
+                }
+
+                if (shouldSkip) {
+                    continue;
+                }
+
+                tagsList.add(tagsArray);
 
                 Document doc = new Document("newsId", relatedNews);
                 doc.put("categoryIds", category);
@@ -668,6 +810,30 @@ public class Cluster {
                         new UpdateOptions().upsert(true));
 
 
+
+                List<RelatedNews> newsList = newsRelated.get(newsToUpdate);
+                if (newsList != null) {
+                    RelatedNews relatedNewsObj = new RelatedNews();
+                    relatedNewsObj.setNewsId(relatedNews);
+                    relatedNewsObj.setNewsType(MessageType.getByName(newsType));
+                    relatedNewsObj.setScore(entry._1);
+                    if (category != null) {
+                        System.out.println("category is: " + category.toString());
+                        JSONArray categoryIdsArr = (JSONArray) JSON.parse(category.toString());
+                        if (categoryIdsArr != null) {
+                            List<Integer> ids = new ArrayList<Integer>();
+                            for (int m = 0; m < categoryIdsArr.size(); m++) {
+                                ids.add((Integer) categoryIdsArr.get(m));
+                            }
+                            relatedNewsObj.setCategoryIds(ids);
+                        }
+                    }
+                    newsList.add(relatedNewsObj);
+                    System.out.println(relatedNewsObj.toString());
+                }
+                newsRelated.put(newsToUpdate, newsList);
+
+                /*
                 FindIterable iterable = newsContent.find(new Document("_id", newsToUpdate));
                 MongoCursor cursor = iterable.iterator();
                 while (cursor.hasNext()) {
@@ -707,9 +873,18 @@ public class Cluster {
                     queuedProducer.sendMessage("topic_news_related", msg);
                 }
                 cursor.close();
+                */
             }
         }
 
+        for (Map.Entry<String, List<RelatedNews>> entry : newsRelated.entrySet()) {
+            String newsToUpdate = entry.getKey();
+            RelatedNewsMsg msg = new RelatedNewsMsg();
+            msg.setNewsId(newsToUpdate);
+            msg.setRelatedNews(entry.getValue());
+            System.out.println("the message is: " + msg.toString());
+            queuedProducer.sendMessage("topic_news_related", msg);
+        }
         /*
         {
             Document doc = new Document("sentence", combinedSentence);
