@@ -367,7 +367,7 @@ public class Cluster {
         Long timeSpan = 0L;
         if (ENV != null && ENV.equals("prod")) {
             // timeSpan = 2592000L * 1000;
-            timeSpan = 1000L * 60 * 60 * 24 * 15;
+            timeSpan = 1000L * 60 * 60 * 24 * 17;
         } else {
             timeSpan = 48L * 60 * 60 * 1000;
         }
