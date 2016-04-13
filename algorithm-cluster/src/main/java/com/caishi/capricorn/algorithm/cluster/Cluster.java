@@ -361,7 +361,7 @@ public class Cluster {
         mongodbConfig.set("mongo.job.input.format",
                 "com.mongodb.hadoop.MongoInputFormat");
         mongodbConfig.set("mongo.input.fields",
-                "{\"createtime\":1, \"debugInfo\":1, \"relatedNews\":1, \"categoryIds\":1, \"newsType\":1}");
+                "{\"gmtCreated\":1, \"debugInfo\":1, \"relatedNews\":1, \"categoryIds\":1, \"newsType\":1}");
         // mongo.input.query
         final Long timeStamp = new Date().getTime();
         Long timeSpan = 0L;
@@ -374,7 +374,7 @@ public class Cluster {
         final Long finalTimeSpan = timeSpan;
         Long startTime = timeStamp - finalTimeSpan;
         mongodbConfig.set("mongo.input.query",
-                "{\"createtime\": {\"$gt\": " + startTime + "}}");
+                "{\"gmtCreated\": {\"$gt\": " + startTime + "}}");
 
         // MongoDB connection string naming a collection to use.
         // If using BSON, use "mapred.input.dir" to configure the directory
@@ -396,10 +396,10 @@ public class Cluster {
             public Boolean call(Tuple2<Object, BSONObject> document) {
                 Boolean result = false;
                 //System.out.println(document._2);
-                if (document._2.containsField("createtime")) {
-                    Long createTime = (Long) document._2.get("createtime");
-                    //System.out.println(createTime);
-                    if ((timeStamp - createTime) > finalTimeSpan) {
+                if (document._2.containsField("gmtCreated")) {
+                    Long gmtCreated = (Long) document._2.get("gmtCreated");
+                    //System.out.println(gmtCreated);
+                    if ((timeStamp - gmtCreated) > finalTimeSpan) {
                         return false;
                     }
                 } else {
@@ -437,10 +437,10 @@ public class Cluster {
                     return false;
                 }
 
-                if (document._2.containsField("createtime")) {
-                    Long createTime = (Long) document._2.get("createtime");
-                    //System.out.println(createTime);
-                    if ((timeStamp - createTime) > 70 * 60 * 1000) {
+                if (document._2.containsField("gmtCreated")) {
+                    Long gmtCreated = (Long) document._2.get("gmtCreated");
+                    //System.out.println(gmtCreated);
+                    if ((timeStamp - gmtCreated) > 70 * 60 * 1000) {
                         return false;
                     }
                 } else {
