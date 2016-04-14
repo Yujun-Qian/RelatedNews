@@ -624,7 +624,7 @@ public class Cluster {
                         if (categoryIdsArr != null) {
                             for (int m = 0; m < categoryIdsArr.size(); m++) {
                                 Integer categoryId = (Integer) categoryIdsArr.get(m);
-                                if (categoryId == 36 || categoryId == 38 || categoryId == 78) {
+                                if (/*categoryId == 36 || */categoryId == 38 || categoryId == 78) {
                                     shouldContinue = true;
                                     break;
                                 }
@@ -647,7 +647,7 @@ public class Cluster {
                         if (categoryIdsArr != null) {
                             for (int m = 0; m < categoryIdsArr.size(); m++) {
                                 Integer categoryId = (Integer) categoryIdsArr.get(m);
-                                if (categoryId == 36 || categoryId == 38 || categoryId == 78) {
+                                if (/*categoryId == 36 || */categoryId == 38 || categoryId == 78) {
                                     shouldContinue = true;
                                     break;
                                 }
