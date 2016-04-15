@@ -610,7 +610,7 @@ public class Cluster {
                         new UpdateOptions().upsert(true));
             }
 
-            if (entry._1 > 60.0 || entry._1 < 2.90) {
+            if (entry._1 > 49.0 || entry._1 < 2.90) {
                 continue;
             }
 
@@ -781,8 +781,8 @@ public class Cluster {
                         }
                         Double score = 100.0 * commonTag / strings.size();
                         System.out.println("inter-news score is: " + score);
-                        if (score > 75.0) {
-                            System.out.println("inter-news score > 75.0");
+                        if (score > 49.0) {
+                            System.out.println("inter-news score > 49.0");
                             System.out.println("newsToUpdate is: " + newsToUpdate);
                             System.out.println("related news is: " + relatedNews);
 
