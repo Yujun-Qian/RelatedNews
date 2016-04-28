@@ -543,7 +543,28 @@ public class Cluster {
                 };
         JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result = tagOfDocsLastQuar.flatMapToPair(map);
 
-        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result2 = result.sortByKey(false);
+
+        Function<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>, Boolean> filterLowScoreItems = new Function<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>, Boolean>() {
+            public Boolean call(Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> item) {
+                Boolean result = true;
+                String index1 = item._2._1._1.toString();
+                String index2 = item._2._1._2.toString();
+
+                if (item._1 < 2.90) {
+                    result = false;
+                } else if (index1.equals(index2)) {
+                    result = false;
+                } else if(index1.startsWith("SP-") || index2.startsWith("SP-")) {
+                    result = false;
+                }
+
+                return result;
+            }
+        };
+
+        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result1 = result.filter(filterLowScoreItems);
+
+        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result2 = result1.sortByKey(false);
         System.out.println("result2.count is: " + result2.count());
         System.out.println("result2 is: ");
         //result2.saveAsTextFile("/directory/result0311_1");
