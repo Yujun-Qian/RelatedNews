@@ -427,7 +427,7 @@ public class Cluster {
             }
         };
         JavaPairRDD<Object, BSONObject> docsOfLastQuar = documents.filter(filterGetLastQuar);
-        System.out.println("docsOfLastQuar : " + docsOfLastQuar.count());
+        //System.out.println("docsOfLastQuar : " + docsOfLastQuar.count());
 
         Function<Tuple2<Object, BSONObject>, Boolean> filterGetLastHour = new Function<Tuple2<Object, BSONObject>, Boolean>() {
             public Boolean call(Tuple2<Object, BSONObject> document) {
@@ -458,7 +458,7 @@ public class Cluster {
             }
         };
         JavaPairRDD<Object, BSONObject> docsOfLastHour = docsOfLastQuar.filter(filterGetLastHour);
-        System.out.println("docsOfLastHour : " + docsOfLastHour.count());
+        //System.out.println("docsOfLastHour : " + docsOfLastHour.count());
 
         Function<BSONObject, Tuple2<JSONArray, BSONObject>> extractTags = new Function<BSONObject, Tuple2<JSONArray, BSONObject>>() {
             public Tuple2<JSONArray, BSONObject> call(BSONObject document) {
@@ -562,10 +562,10 @@ public class Cluster {
             }
         };
 
-        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result1 = result.filter(filterLowScoreItems);
+        //JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result1 = result.filter(filterLowScoreItems);
 
-        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result2 = result1.sortByKey(false);
-        System.out.println("result2.count is: " + result2.count());
+        JavaPairRDD<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> result2 = result.sortByKey(false, 70);
+        //System.out.println("result2.count is: " + result2.count());
         System.out.println("result2 is: ");
         //result2.saveAsTextFile("/directory/result0311_1");
 
