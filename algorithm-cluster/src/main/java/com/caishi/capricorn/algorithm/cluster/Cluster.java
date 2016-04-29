@@ -90,6 +90,7 @@ import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
 import scala.Tuple2;
+import scala.reflect.*;
 
 public class Cluster {
     private String content;
@@ -304,6 +305,17 @@ public class Cluster {
 
     public static void main(String[] args) {
         SparkConf sparkConf = new SparkConf().setAppName("Cluster");
+        sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
+        sparkConf.set("spark.kryoserializer.buffer.max.mb", "2000");
+        sparkConf.set("spark.kryo.registrationRequired", "true");
+        try {
+            sparkConf.registerKryoClasses(new Class<?>[]{com.alibaba.fastjson.JSONArray.class, org.bson.BSONObject.class, scala.Tuple2.class, scala.Tuple2[].class, com.alibaba.fastjson.JSONObject.class,
+                    java.math.BigDecimal.class, org.bson.BasicBSONObject.class, com.mongodb.BasicDBList.class, scala.Tuple3[].class, Object[].class, scala.reflect.ClassTag.class,
+                    Class.forName("scala.reflect.ClassTag$$anon$1"), java.lang.Class.class });
+        } catch (Exception e) {
+            
+        }
+
         JavaSparkContext sc = new JavaSparkContext(sparkConf);
 
         final Set<String> stopWords = initStopWordsSet();
@@ -369,7 +381,7 @@ public class Cluster {
             // timeSpan = 2592000L * 1000;
             timeSpan = 1000L * 60 * 60 * 24 * 17;
         } else {
-            timeSpan = 48L * 60 * 60 * 1000;
+            timeSpan = 8L * 60 * 60 * 1000;
         }
         final Long finalTimeSpan = timeSpan;
         Long startTime = timeStamp - finalTimeSpan;
