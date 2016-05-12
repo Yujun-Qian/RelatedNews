@@ -304,10 +304,11 @@ public class Cluster {
     }
 
     public static void main(String[] args) {
-        SparkConf sparkConf = new SparkConf().setAppName("Cluster");
+        SparkConf sparkConf = new SparkConf().setAppName("Cluster").setMaster("local");
         sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
         sparkConf.set("spark.kryoserializer.buffer.max.mb", "2000");
-        sparkConf.set("spark.kryo.registrationRequired", "true");
+        //sparkConf.set("spark.kryo.registrationRequired", "true");
+
         try {
             sparkConf.registerKryoClasses(new Class<?>[]{com.alibaba.fastjson.JSONArray.class, org.bson.BSONObject.class, scala.Tuple2.class, scala.Tuple2[].class, com.alibaba.fastjson.JSONObject.class,
                     java.math.BigDecimal.class, org.bson.BasicBSONObject.class, com.mongodb.BasicDBList.class, scala.Tuple3[].class, Object[].class, scala.reflect.ClassTag.class,
@@ -362,7 +363,9 @@ public class Cluster {
             e.printStackTrace();
         }
 
-        MongoClient mongoClient = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)));
+        //MongoClient mongoClient = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)));
+        MongoClient mongoClient = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)),
+                Arrays.asList(MongoCredential.createCredential("news", "news", "news9icaishi".toCharArray())));
         final MongoDatabase newsDB = mongoClient.getDatabase("news");
         final MongoCollection newsContent = newsDB.getCollection("newsContent");
 
@@ -379,7 +382,7 @@ public class Cluster {
         Long timeSpan = 0L;
         if (ENV != null && ENV.equals("prod")) {
             // timeSpan = 2592000L * 1000;
-            timeSpan = 1000L * 60 * 60 * 24 * 17;
+            timeSpan = 1000L * 60 * 60 * 24 * 16;
         } else {
             timeSpan = 8L * 60 * 60 * 1000;
         }
@@ -391,8 +394,13 @@ public class Cluster {
         // MongoDB connection string naming a collection to use.
         // If using BSON, use "mapred.input.dir" to configure the directory
         // where BSON files are located instead.
+        /*
         mongodbConfig.set("mongo.input.uri",
                 "mongodb://" + NewsDB_IPAddress + ":" + NewsDB_Port + "/news.newsContent");
+                */
+        //mongodbConfig.set("mongo.auth.uri", "mongodb://news:news9icaishi@" + NewsDB_IPAddress + ":" + NewsDB_Port + "/news");
+        mongodbConfig.set("mongo.splitter.class", "com.mongodb.hadoop.splitter.SingleMongoSplitter");
+        mongodbConfig.set("mongo.input.uri", "mongodb://news:news9icaishi@" + NewsDB_IPAddress + ":" + NewsDB_Port + "/news.newsContent");
 
         // Create an RDD backed by the MongoDB collection.
         JavaPairRDD<Object, BSONObject> documents = sc.newAPIHadoopRDD(
@@ -483,13 +491,13 @@ public class Cluster {
                 try {
                     BSONObject debugInfo = (BSONObject) document.get("debugInfo");
                     String tags = (String) debugInfo.get("tags");
-                    System.out.println("tags is: " + tags);
+                    //System.out.println("tags is: " + tags);
                     tag = (JSONArray) JSON.parseArray(tags);
 
                     categoryIds = (BSONObject) document.get("categoryIds");
-                    System.out.println("categoryIds is: " + categoryIds);
+                    //System.out.println("categoryIds is: " + categoryIds);
                     newsType = (String) document.get("newsType");
-                    System.out.println("newsType is: " + newsType);
+                    //System.out.println("newsType is: " + newsType);
 
                     obj.put("categoryIds", categoryIds);
                     obj.put("newsType", newsType);
@@ -520,8 +528,8 @@ public class Cluster {
                             BSONObject categoryIds_1 = tag.getValue()._2;
 
                             Set<String> strings = new HashSet<String>();
-                            System.out.println(pair._2._1);
-                            System.out.println(tag.getValue()._1);
+                            //System.out.println(pair._2._1);
+                            //System.out.println(tag.getValue()._1);
                             JSONArray a = pair._2._1;
                             for (int i = 0; i < a.size(); i++) {
                                 JSONObject tagObj = (JSONObject) a.get(i);
@@ -543,7 +551,7 @@ public class Cluster {
                                 }
                             }
                             score = 100.0 * commonTag / strings.size();
-                            System.out.println("score is: " + score);
+                            //System.out.println("score is: " + score);
                             if (score > 10E-6 /*&& score < 100.0*/) {
                                 Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>> itemWithCategoryIds = new Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>(item, new Tuple2<BSONObject, BSONObject>(categoryIds_1, categoryIds_2));
                                 result.add(new Tuple2(score, itemWithCategoryIds));
