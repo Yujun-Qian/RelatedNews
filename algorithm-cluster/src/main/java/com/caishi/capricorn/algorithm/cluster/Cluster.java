@@ -57,6 +57,7 @@ import java.io.Reader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
+import org.apache.spark.broadcast.Broadcast;
 import org.bson.Document;
 import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
@@ -305,6 +306,7 @@ public class Cluster {
 
     public static void main(String[] args) {
         SparkConf sparkConf = new SparkConf().setAppName("Cluster").setMaster("local");
+        /*
         sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
         sparkConf.set("spark.kryoserializer.buffer.max.mb", "2000");
         //sparkConf.set("spark.kryo.registrationRequired", "true");
@@ -316,6 +318,7 @@ public class Cluster {
         } catch (Exception e) {
             
         }
+        */
 
         JavaSparkContext sc = new JavaSparkContext(sparkConf);
 
@@ -382,7 +385,7 @@ public class Cluster {
         Long timeSpan = 0L;
         if (ENV != null && ENV.equals("prod")) {
             // timeSpan = 2592000L * 1000;
-            timeSpan = 1000L * 60 * 60 * 24 * 16;
+            timeSpan = 1000L * 60 * 60 * 24 * 18;
         } else {
             timeSpan = 8L * 60 * 60 * 1000;
         }
@@ -400,7 +403,7 @@ public class Cluster {
                 */
         //mongodbConfig.set("mongo.auth.uri", "mongodb://news:news9icaishi@" + NewsDB_IPAddress + ":" + NewsDB_Port + "/news");
         mongodbConfig.set("mongo.splitter.class", "com.mongodb.hadoop.splitter.SingleMongoSplitter");
-        mongodbConfig.set("mongo.input.uri", "mongodb://news:news9icaishi@" + NewsDB_IPAddress + ":" + NewsDB_Port + "/news.newsContent");
+        mongodbConfig.set("mongo.input.uri", "mongodb://news:news9icaishi@" + NewsDB_IPAddress + ":" + NewsDB_Port + "/news.newsContent?connectTimeoutMS=30000000");
 
         // Create an RDD backed by the MongoDB collection.
         JavaPairRDD<Object, BSONObject> documents = sc.newAPIHadoopRDD(
@@ -460,7 +463,7 @@ public class Cluster {
                 if (document._2.containsField("gmtCreated")) {
                     Long gmtCreated = (Long) document._2.get("gmtCreated");
                     //System.out.println(gmtCreated);
-                    if ((timeStamp - gmtCreated) > 70 * 60 * 1000) {
+                    if ((timeStamp - gmtCreated) > 35 * 60 * 1000) {
                         return false;
                     }
                 } else {
@@ -512,6 +515,7 @@ public class Cluster {
         JavaPairRDD<Object, Tuple2<JSONArray, BSONObject>> tagOfDocsLastHour = docsOfLastHour.mapValues(extractTags);
         JavaPairRDD<Object, Tuple2<JSONArray, BSONObject>> tagOfDocsLastQuar = docsOfLastQuar.mapValues(extractTags);
         final Map<Object, Tuple2<JSONArray, BSONObject>> tagMapLastHour = tagOfDocsLastHour.collectAsMap();
+        final Broadcast<Map<Object, Tuple2<JSONArray, BSONObject>>> tagMapLastHourBroadcast = sc.broadcast(tagMapLastHour);
 
         PairFlatMapFunction<Tuple2<Object, Tuple2<JSONArray, BSONObject>>, Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>> map =
                 new PairFlatMapFunction<Tuple2<Object, Tuple2<JSONArray, BSONObject>>, Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>() {
@@ -519,7 +523,7 @@ public class Cluster {
                         List<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>> result = new ArrayList<Tuple2<Double, Tuple2<Tuple2<Object, Object>, Tuple2<BSONObject, BSONObject>>>>();
                         BSONObject categoryIds_2 = (BSONObject) pair._2._2;
 
-                        for (Map.Entry<Object, Tuple2<JSONArray, BSONObject>> tag : tagMapLastHour.entrySet()) {
+                        for (Map.Entry<Object, Tuple2<JSONArray, BSONObject>> tag : tagMapLastHourBroadcast.value().entrySet()) {
                             Double score = 0.0;
                             Double commonTag = 0.0;
                             Object obj1 = tag.getKey();
@@ -651,7 +655,7 @@ public class Cluster {
                         new UpdateOptions().upsert(true));
             }
 
-            if (entry._1 > 49.0 || entry._1 < 2.90) {
+            if (entry._1 > 60.1 || entry._1 < 2.90) {
                 continue;
             }
 
